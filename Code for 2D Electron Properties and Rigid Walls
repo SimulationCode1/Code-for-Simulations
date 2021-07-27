@@ -1,0 +1,228 @@
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+np.random.seed(0)
+class Particle():
+    
+    def __init__(self, id=0, p=np.zeros(3), v=np.zeros(3), R=0.2, m=1, c=1, nf=np.zeros(3)):
+        self.id, self.r, self.v, self.R, self.m, self.c, self.fnet = id, p, v, R, m, c, nf
+        self.color = "blue"
+
+class Sim():
+
+  X = 5
+  Y = 5
+  Z = 5
+  KE = 1 #E9
+  counter = 0
+
+  def __init__(self, dt = 50E-6, Np = 20):
+    self.dt, self.Np = dt, Np
+    self.particles = [Particle(i) for i in range(self.Np)]
+
+  def force_detection(self):
+      ignore_list = {}
+      for particle1 in self.particles:
+          ignore_list[particle1] = []
+          #if particle1 in ignore_list:
+          #    continue
+              
+          x, y, z = particle1.r
+          
+         
+          if (x > self.X / 2 - particle1.R) or (x < -self.X / 2 + particle1.R):
+              #particle1.v[0] *= -1
+              #particle1.r[0] = self.X / 2 - particle1.r[0]
+              particle1.v[0] *= -1
+              
+              #if particle1.r[0] < - self.X / 2: 
+                  #particle1.r[0] =  self.X / 2
+              #elif particle1.r[0] > self.X / 2:
+                  #particle1.r[0] = - self.X / 2
+              
+         #     
+          if (y > self.Y / 2 - particle1.R) or (y < -self.Y / 2 + particle1.R):
+              particle1.v[1] *= -1
+              #particle1.r[1] = self.Y - particle1.r[1]
+          if (z > self.Z / 2 - particle1.R) or (z < -self.Z / 2 + particle1.R):
+              particle1.v[2] *= -1
+              #particle1.r[2] = self.Z - particle1.r[2]
+              
+            
+          
+          for particle2 in self.particles:
+              if id(particle1) == id(particle2):
+                  continue
+              if particle2 in ignore_list[particle1]:
+                  continue
+              if particle2 in ignore_list and particle1 in ignore_list[particle2]:
+                  continue
+              
+              ignore_list[particle1].append(particle2)
+              
+              if particle2 in ignore_list:
+                  ignore_list[particle2].append(particle1)
+              else:
+                  ignore_list[particle2] = [particle1]
+            
+              self.calcMag(particle1,particle2)
+        
+              
+              
+          particle1.v += 0.1 * particle1.fnet / particle1.m
+          particle1.r += self.dt * particle1.v
+              
+              
+              
+  def calcMag(self,particle1,particle2):
+        v = particle2.r - particle1.r
+        mag = np.linalg.norm(v)
+       
+        factor = self.KE * particle2.c * particle1.c / mag
+        f = -v * factor / mag
+        particle1.fnet += f
+        particle2.fnet -= f
+        
+        #print(f"Original: {v}")
+        
+        #v = np.array([self.X,self.Y,self.Z]) - v
+        v = np.array([self.X,0,0]) - abs(v)
+        
+        print(f"Post: {v}")
+        
+        mag = np.linalg.norm(v)
+        factor = self.KE * particle2.c * particle1.c / mag
+        f = -v * factor / mag
+        particle1.fnet -= f
+        particle2.fnet += f
+        
+
+        
+              
+              
+  def increment(self):
+      for particle in self.particles:
+          particle.fnet = np.zeros(3)
+      self.force_detection()
+      # print("\n")
+      #for particle in self.particles:
+          # particle.v += self.dt * particle.fnet / particle.m
+          #particle.v += 1 * particle.fnet / particle.m
+          # print(f"[{self.counter}] New Velocity: {np.linalg.norm(particle.v)}")
+          #particle.r += self.dt * particle.v
+
+  def particle_positions(self):
+    return [np.array([particles.r[0],particles.r[1]]) for particles in self.particles]
+
+  def particle_colors(self):
+    return [particles.color for particles in self.particles]
+
+  #def particle_speeds(self):
+   # return [np.sqrt(np.dot(particles.v, particle.v)) for particles in self.particles]
+
+  def E_avg(self):
+        E_avg = 0
+        for particle in self.particles:
+            E_avg += 0.5*particle.m*np.dot(particle.v, particle.v)
+        return E_avg/len(self.particles)
+
+  def temperature(self):
+        return self.E_avg()*(2/3)/1.380649E-23
+  
+
+#sim variables
+Np = 20
+
+m = 127*1.66E-27
+T_init = 293.15
+v_avg = np.sqrt(3/2*1.380649E-23*T_init*2/m)
+
+
+sim = Sim(Np = Np,dt = 50E-6)
+
+for particle in sim.particles:
+  # particle.m = m
+  # particle.r = np.random.uniform([-sim.X/2,0],[sim.X/2,0],size=2)
+    # particle.r = np.random.uniform(
+        # [-sim.X/2, -sim.Y/2, -sim.Z/2], [sim.X/2, sim.Y/2, sim.Z/2], size=3)
+  particle.r = np.random.uniform([-sim.X/2,-sim.Y/2,0],[sim.X/2,sim.Y/2,0],size=3)
+
+  # particle.v = v_avg * np.array([np.cos(np.pi * 2), 0 ])
+  particle.v = np.array([np.cos(np.pi/4), np.cos(np.pi/4),np.cos(np.pi/4)],dtype = np.float32)
+  
+sim.particles[0].color = "red"
+sim.particles[1].color = "green"
+
+
+#plot code
+
+n_avg = 100
+
+fig, (ax, ax2) = plt.subplots(figsize = (5,9), nrows = 2)
+ax.set_xticks([]), ax.set_yticks([])
+ax.set_aspect("equal")
+
+vs = np.arange(0,500,25)
+
+scatter = ax.scatter([],[])
+bar = ax2.bar(vs, [0]*len(vs), width=0.9*np.gradient(vs), align="edge", alpha = 0.8)
+
+theo = ax2.plot(vs, 25*Np*(m/(2*np.pi*1.380649E-23*sim.temperature()))**(3/2) * 4 *
+                np.pi*vs**2 * np.exp(-m*vs**2/(2*1.380649E-23*sim.temperature())), color="orange")
+
+T_txt = ax.text(sim.X/2*0.5, sim.Y/2*0.92, s="")
+
+#freqs_matrix = np.tile((np.histogram(sim.particle_speeds(), bins=vs)[0].astype(np.float)), (n_avg, 1))
+
+              
+def init():
+  ax.set_xlim(-sim.X/2, sim.X/2)
+  ax.set_ylim(-sim.Y/2, sim.Y/2)
+  ax2.set_xlim(vs[0], vs[-1])
+  ax2.set_ylim(0, Np)
+  ax2.set(xlabel="Particle Speed (m/s)", ylabel="# of particles")
+  return (scatter, *bar.patches)
+
+def update(frame):
+  sim.increment()
+  
+  #T_txt.set_text(f"{sim.temperature():.2f} K")
+  
+  #freqs, bins = np.histogram(sim.particle_speeds(),bins = vs)
+  #freqs_matrix[frame % n_avg] = freqs
+  #freqs_mean = np.mean(freqs_matrix,axis=0)
+  #freqs_max = np.max(freqs_mean)
+  
+  #for rect, height in zip(bar.patches,freqs_mean):
+   #   rect.set_height(height)
+      
+      
+  #if np.abs(freqs_max - ax2.get_ylim()[1]) > 10:
+   #   ax2.set_ylim(0,5 + ax2.get_ylim()[1] + (freqs_max - ax2.get_ylim()[1]))
+    #  fig.canvas.draw()
+  
+  scatter.set_offsets(np.array(sim.particle_positions()))
+  scatter.set_color(sim.particle_colors())
+  
+  
+  return (scatter, *bar.patches, T_txt)
+
+
+ani = FuncAnimation(fig,update,frames=range(8000),init_func = init,blit=True,interval=1/500,repeat=False)
+
+
+
+
+
+
+
+# # ax.scatter(sim.particle_positions())
+
+# a= np.array(sim.particle_positions())
+# ax.scatter(a[:,0], a[:,1])
+
+# sim.increment()
+
+# a= np.array(sim.particle_positions())
+# ax.scatter(a[:,0], a[:,1])
